@@ -529,6 +529,10 @@ bool RTree::del(const vector<int>& coordinate)
 	RTNode* L = find_leaf(root, stack, entry_idx, stack_size, record);
 	//D3, condense_tree
 	condense_tree(L, stack, entry_idx, stack_size);
+	//D4, if the root has only one child
+	if (root->entry_num == 1){
+		root = root->entries[0].get_ptr();
+	}
 }
 
 void RTree::condense_tree(RTNode* node, RTNode** stack, int* entry_idx, int stack_size){
