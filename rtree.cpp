@@ -1,6 +1,7 @@
 /* Implementations of R tree */
 #include <cmath>
 #include "rtree.h"
+#include <stdio.h>
 
 
 const double EPSILON = 1E-10;
@@ -528,21 +529,21 @@ bool RTree::del(const vector<int>& coordinate)
 	//D1&D2
 	RTNode* L = find_leaf(root, stack, entry_idx, stack_size, record);
 	//D3, condense_tree
-	condense_tree(L, stack, entry_idx, stack_size);
+	vector<RTNode*> Q;
+	condense_tree(L, stack, entry_idx, stack_size, Q);
 	//D4, if the root has only one child
 	if (root->entry_num == 1){
 		root = root->entries[0].get_ptr();
 	}
 }
 
-void RTree::condense_tree(RTNode* node, RTNode** stack, int* entry_idx, int stack_size){
+void RTree::condense_tree(RTNode* node, RTNode** stack, int* entry_idx, int stack_size, vector<RTNode*>& Q){
 	RTNode* N = node;
-	vector<RTNode*> Q;
+	// vector<RTNode*> Q;
 	//if N is the root
 	if (N->level == root->level){
 		//CT6
 		//re-insert all entries of nodes in set Q
-		// insert(const Entry& e, int dest_level)
 		//Q contains levelx node, levelx+1 node, +2 ...
 		//insert high level nodes first, also for entries in a node, use tie-breaking
 		int size = Q.size();
@@ -560,7 +561,7 @@ void RTree::condense_tree(RTNode* node, RTNode** stack, int* entry_idx, int stac
 				}
 			}
 			for (int k = 0; k < node_to_reinsert->entry_num; k++){
-				insert(node_to_reinsert->entries[k], 0);
+				insert(node_to_reinsert->entries[k].get_mbr().get_lowest(), node_to_reinsert->entries[k].get_rid());
 			}
 		}
 	}
@@ -584,7 +585,7 @@ void RTree::condense_tree(RTNode* node, RTNode** stack, int* entry_idx, int stac
 			En.set_mbr(get_mbr(N->entries, N->entry_num));
 		}
 		//CT5
-		condense_tree(P, stack, entry_idx, stack_size-1);
+		condense_tree(P, stack, entry_idx, stack_size-1, Q);
 	}
 }
 
