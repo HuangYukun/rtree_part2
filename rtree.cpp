@@ -201,9 +201,11 @@ void RTree::linear_pick_seeds(Entry* entry_list, int len, int& m1, int& m2)
 //
 RTNode* RTree::find_leaf(RTNode* node, RTNode** stack, int* entry_idx, int& stack_size, const Entry& record)
 {
+	//if node is a leaf node
 	if (node->level == 0) {
 		for (int i = 0; i < node->entry_num; i++) {
 			if (overlap(node->entries[i].get_mbr(), record.get_mbr())) {
+				//does overlapping means the same? - for entries, yes, because they're points
 				swap_entry(node->entries, i, node->entry_num-1); // move the record the the end to indicate ``deleted''
 				node->entry_num--;
 				return node;
@@ -213,9 +215,12 @@ RTNode* RTree::find_leaf(RTNode* node, RTNode** stack, int* entry_idx, int& stac
 	else {
 		for (int i = 0; i < node->entry_num; i++) {
 			if (overlap(node->entries[i].get_mbr(), record.get_mbr())) {
+				//what is the stack, we go to see how it's passed into del
+				//-it's not passed into del, we need to define it
 				stack[stack_size] = node;
 				entry_idx[stack_size] = i;
 				stack_size++;
+				//call find_leaf on its entry's pointer, which is a node on a lower level
 				RTNode* ret = find_leaf(node->entries[i].get_ptr(), stack, entry_idx, stack_size, record);
 				if (ret != NULL) {
 					return ret;
@@ -509,6 +514,74 @@ bool RTree::del(const vector<int>& coordinate)
 	/*
 	Add your code here
 	*/
+
+	// stack contains the path to the leaf (not including the leaf node).
+	RTNode** stack = new RTNode*[root->level];
+	int stack_size = 0;
+	// entry_idx contains the index of each entry in the node from the path.
+	int* entry_idx = new int[root->level];
+	//make a record from given vector of coordinates
+	//example call: >> d 2306 413
+	BoundingBox mbr(coordinate, coordinate);
+	Entry record;
+	record.set_mbr(mbr);
+	//D1&D2
+	RTNode* L = find_leaf(root, stack, entry_idx, stack_size, record);
+	//D3, condense_tree
+	condense_tree(L, stack, entry_idx, stack_size);
+}
+
+void RTree::condense_tree(RTNode* node, RTNode** stack, int* entry_idx, int stack_size){
+	RTNode* N = node;
+	vector<RTNode*> Q;
+	//if N is the root
+	if (N->level == root->level){
+		//CT6
+		//re-insert all entries of nodes in set Q
+		// insert(const Entry& e, int dest_level)
+		//Q contains levelx node, levelx+1 node, +2 ...
+		//insert high level nodes first, also for entries in a node, use tie-breaking
+		int size = Q.size();
+		for (int a = 0; a < size; a++){
+			RTNode* node_to_reinsert = Q.back();
+			Q.pop_back();
+			//sort based on tie breaking rule
+			//bubble sort
+			for (int i = 0; i < node_to_reinsert->entry_num; i++){
+				for (int j = i+1; j < node_to_reinsert->entry_num; j++){
+					if(tie_breaking(node_to_reinsert->entries[j].get_mbr(), node_to_reinsert->entries[i].get_mbr())){
+						//swap entries[j] and entries[i]
+						swap_entry(node_to_reinsert->entries, i, j);
+					}
+				}
+			}
+			for (int k = 0; k < node_to_reinsert->entry_num; k++){
+				insert(node_to_reinsert->entries[k], 0);
+			}
+		}
+	}
+	else{
+		//let P be the parent of N
+		RTNode* P = stack[stack_size-1];
+		//let En be N's entry in P
+		Entry En;
+		En = stack[stack_size-1]->entries[entry_idx[stack_size-1]];
+		//CT3
+		if (N->entry_num < (N->size / 2 + N->size % 2)){
+			//delete En from P
+			swap_entry(P->entries, entry_idx[stack_size-1], P->entry_num-1);
+			P->entry_num--;
+			//add N to set Q
+			Q.push_back(N);
+		}//CT4
+		else{
+			//N's not eliminated
+			//adjust En's bounding box
+			En.set_mbr(get_mbr(N->entries, N->entry_num));
+		}
+		//CT5
+		condense_tree(P, stack, entry_idx, stack_size-1);
+	}
 }
 
 
